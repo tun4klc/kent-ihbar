@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Xcode – kişisel kullanıcı ayarları
+xcuserdata/
+*.xcuserstate
+
+# Derleme çıktıları
+build/
+DerivedData/
+
+# Swift Package Manager önbelleği
+.swiftpm/
+.build/
