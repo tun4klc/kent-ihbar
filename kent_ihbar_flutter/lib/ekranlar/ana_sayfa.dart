@@ -30,8 +30,14 @@ class _AnaSayfaState extends State<AnaSayfa> {
     final konum = KonumKapsami.of(context);
     final ustBosluk = MediaQuery.paddingOf(context).top;
 
-    final acikSayisi = konum.izinVar ? durum.ihbarlar.where((i) => i.durum != Durum.cozuldu).length : 0;
-    final cozulenSayisi = konum.izinVar ? durum.ihbarlar.where((i) => i.durum == Durum.cozuldu).length : 0;
+    final yer = konum.konum;
+    if (yer != null) {
+      // Konum gelince ya da değişince çevredeki ihbarlar çekilir (aynı yerse tekrar istenmez).
+      WidgetsBinding.instance.addPostFrameCallback((_) => durum.cevreYukle(yer));
+    }
+    final cevre = konum.izinVar ? durum.cevre.veri : const <Ihbar>[];
+    final acikSayisi = cevre.where((i) => i.durum.acik).length;
+    final cozulenSayisi = cevre.where((i) => i.durum == Durum.cozuldu).length;
 
     return Stack(
       children: [
@@ -43,69 +49,75 @@ class _AnaSayfaState extends State<AnaSayfa> {
           height: MediaQuery.sizeOf(context).height / 2,
           child: DecoratedBox(decoration: BoxDecoration(gradient: _UstAlanRenk.gradyan(r))),
         ),
-        SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _UstAlan(
-                ustBosluk: ustBosluk,
-                yeniIhbar: () => widget.yeniIhbar(),
-                haritayaGit: widget.haritayaGit,
-                siralamayaGit: widget.siralamayaGit,
-              ),
-              Container(
-                color: r.zemin,
-                padding: const EdgeInsets.fromLTRB(KI.space5, KI.space6, KI.space5, KI.space8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AnimatedSize(
-                      duration: KI.sureOrta,
-                      curve: KI.egriStandart,
-                      alignment: Alignment.topCenter,
-                      child: konum.izinVar
-                          ? const SizedBox(width: double.infinity)
-                          : Padding(
-                              padding: const EdgeInsets.only(bottom: KI.space6),
-                              child: _izinKarti(r),
-                            ),
-                    ),
-                    Text('Genel durum', style: KIFont.bolumBasligi.renk(r.metin)),
-                    const SizedBox(height: KI.space3),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: IstatistikKarti(tur: IstatistikTuru.acik, deger: acikSayisi),
-                        ),
-                        const SizedBox(width: KI.space3),
-                        Expanded(
-                          child: IstatistikKarti(tur: IstatistikTuru.cozulen, deger: cozulenSayisi),
-                        ),
-                        const SizedBox(width: KI.space3),
-                        const Expanded(child: IstatistikKarti(tur: IstatistikTuru.belediye, deger: 1407)),
-                      ],
-                    ),
-                    const SizedBox(height: KI.space6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text('Kategoriler', style: KIFont.bolumBasligi.renk(r.metin)),
-                        const Spacer(),
-                        Basilabilir(
-                          onTap: () => widget.yeniIhbar(),
-                          child: Text('Tümü', style: KIFont.etiket.renk(r.birincilMetin)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: KI.space3),
-                    _kategoriIzgarasi(),
-                    const SizedBox(height: KI.space6),
-                    _bildirimlerimBolumu(r, durum),
-                  ],
+        RefreshIndicator.adaptive(
+          onRefresh: () => durum.yenile(yer),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _UstAlan(
+                  ustBosluk: ustBosluk,
+                  yeniIhbar: () => widget.yeniIhbar(),
+                  haritayaGit: widget.haritayaGit,
+                  siralamayaGit: widget.siralamayaGit,
                 ),
-              ),
-            ],
+                Container(
+                  color: r.zemin,
+                  padding: const EdgeInsets.fromLTRB(KI.space5, KI.space6, KI.space5, KI.space8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AnimatedSize(
+                        duration: KI.sureOrta,
+                        curve: KI.egriStandart,
+                        alignment: Alignment.topCenter,
+                        child: konum.izinVar
+                            ? const SizedBox(width: double.infinity)
+                            : Padding(
+                                padding: const EdgeInsets.only(bottom: KI.space6),
+                                child: _izinKarti(r),
+                              ),
+                      ),
+                      Text('Genel durum', style: KIFont.bolumBasligi.renk(r.metin)),
+                      const SizedBox(height: KI.space3),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: IstatistikKarti(tur: IstatistikTuru.acik, deger: acikSayisi),
+                          ),
+                          const SizedBox(width: KI.space3),
+                          Expanded(
+                            child: IstatistikKarti(tur: IstatistikTuru.cozulen, deger: cozulenSayisi),
+                          ),
+                          const SizedBox(width: KI.space3),
+                          Expanded(
+                            child: IstatistikKarti(tur: IstatistikTuru.belediye, deger: durum.belediyeSayisi ?? 0),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: KI.space6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text('Kategoriler', style: KIFont.bolumBasligi.renk(r.metin)),
+                          const Spacer(),
+                          Basilabilir(
+                            onTap: () => widget.yeniIhbar(),
+                            child: Text('Tümü', style: KIFont.etiket.renk(r.birincilMetin)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: KI.space3),
+                      _kategoriIzgarasi(),
+                      const SizedBox(height: KI.space6),
+                      _bildirimlerimBolumu(r, durum),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -185,11 +197,11 @@ class _AnaSayfaState extends State<AnaSayfa> {
   // MARK: Bildirimlerim
 
   Widget _bildirimlerimBolumu(KIRenk r, UygulamaDurumu durum) {
-    final benim = durum.ihbarlar.where((i) => i.benim);
+    final benim = durum.benimIhbarlarim;
     final liste = switch (_filtre) {
-      _Filtre.tumu => benim.toList(),
-      _Filtre.acik => benim.where((i) => i.durum != Durum.cozuldu).toList(),
-      _Filtre.cozulen => benim.where((i) => i.durum == Durum.cozuldu).toList(),
+      _Filtre.tumu => benim.veri,
+      _Filtre.acik => benim.veri.where((i) => i.durum.acik).toList(),
+      _Filtre.cozulen => benim.veri.where((i) => i.durum == Durum.cozuldu).toList(),
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,7 +222,22 @@ class _AnaSayfaState extends State<AnaSayfa> {
           duration: KI.sureOrta,
           curve: KI.egriStandart,
           alignment: Alignment.topCenter,
-          child: liste.isEmpty
+          child: benim.yukleniyor && benim.veri.isEmpty
+              ? const Kart(dolgu: 0, child: Yukleniyor())
+              : benim.hata != null && benim.veri.isEmpty
+              ? Kart(
+                  dolgu: 0,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: BosDurum(
+                      baslik: 'Bildirimlerin yüklenemedi',
+                      aciklama: benim.hata!,
+                      eylemAdi: 'Tekrar dene',
+                      eylem: durum.ihbarlarimiYukle,
+                    ),
+                  ),
+                )
+              : liste.isEmpty
               ? const Kart(
                   dolgu: 0,
                   child: SizedBox(
@@ -455,7 +482,7 @@ class _BildirimSatiri extends StatelessWidget {
                 Text(ihbar.kategori.ad, style: KIFont.govde(15, Agirlik.yariKalin).renk(r.metin)),
                 const SizedBox(height: 2),
                 Text(
-                  ihbar.adres,
+                  ihbar.konumMetni,
                   style: KIFont.govde(13).renk(r.metinIkincil),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

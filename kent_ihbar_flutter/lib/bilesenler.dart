@@ -532,16 +532,19 @@ class MenuSatiri extends StatelessWidget {
 }
 
 class SiralamaSatiri extends StatelessWidget {
-  const SiralamaSatiri({super.key, required this.sira, required this.belediye});
+  const SiralamaSatiri({super.key, required this.sira, required this.belediye, this.senin = false});
 
   final int sira;
   final Belediye belediye;
+
+  /// Kullanıcının kayıtlı belediyesi mi.
+  final bool senin;
 
   @override
   Widget build(BuildContext context) {
     final r = KIRenk.of(context);
     return Container(
-      color: belediye.senin ? r.birincilYumusak : Colors.transparent,
+      color: senin ? r.birincilYumusak : Colors.transparent,
       padding: const EdgeInsets.symmetric(horizontal: KI.space4, vertical: 14),
       child: Row(
         children: [
@@ -563,14 +566,16 @@ class SiralamaSatiri extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  belediye.senin ? 'Senin ilçen · ${belediye.kisaAd}' : belediye.ad,
+                  senin ? 'Senin ilçen · ${belediye.kisaAd}' : belediye.ad,
                   style: KIFont.govde(15, Agirlik.yariKalin).renk(r.metin),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${belediye.sehir} · ort. ${turkceOndalik(belediye.ortalamaGun)} gün',
+                  belediye.ortalamaGun == null
+                      ? '${belediye.sehir} · henüz çözüm yok'
+                      : '${belediye.sehir} · ort. ${turkceOndalik(belediye.ortalamaGun!)} gün',
                   style: KIFont.govde(13).renk(r.metinIkincil),
                 ),
                 const SizedBox(height: 8),
@@ -582,7 +587,7 @@ class SiralamaSatiri extends StatelessWidget {
                       children: [
                         Container(color: r.yuzeyUst),
                         FractionallySizedBox(
-                          widthFactor: belediye.puan / 100,
+                          widthFactor: (belediye.puan / 100).clamp(0, 1),
                           child: Container(color: r.birincil),
                         ),
                       ],
@@ -905,6 +910,31 @@ class Ayirici extends StatelessWidget {
         const SizedBox(width: KI.space3),
         Expanded(child: Container(height: 1, color: r.cizgi)),
       ],
+    );
+  }
+}
+
+// MARK: - Geri bildirim
+
+/// API ya da doğrulama hatasını ekranın altında kısa bir uyarıyla gösterir.
+void hataGoster(BuildContext context, String mesaj) {
+  ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(mesaj), behavior: SnackBarBehavior.floating));
+}
+
+/// Liste yüklenirken ortada küçük dönen gösterge.
+class Yukleniyor extends StatelessWidget {
+  const Yukleniyor({super.key, this.yukseklik = 120});
+
+  final double yukseklik;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: yukseklik,
+      width: double.infinity,
+      child: Center(child: CircularProgressIndicator.adaptive(backgroundColor: KIRenk.of(context).cizgi)),
     );
   }
 }

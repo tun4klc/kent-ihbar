@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -62,5 +63,34 @@ class KonumYoneticisi extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+}
+
+/// Koordinattan çözülen adres (ihbarın gideceği belediyeyi bulmak için).
+class Adres {
+  const Adres({this.il, this.ilce, this.tamAdres});
+
+  final String? il;
+  final String? ilce;
+  final String? tamAdres;
+}
+
+/// Cihazın yerleşik geocoder'ı ile ters adres çözümleme; başarısızsa null.
+Future<Adres?> adresBul(LatLng konum) async {
+  String? dolu(String? s) => (s == null || s.trim().isEmpty) ? null : s.trim();
+  try {
+    final yerler = await Geocoding().placemarkFromCoordinates(
+      konum.latitude,
+      konum.longitude,
+      locale: const Locale('tr', 'TR'),
+    );
+    if (yerler.isEmpty) return null;
+    final y = yerler.first;
+    final il = dolu(y.administrativeArea);
+    final ilce = dolu(y.subAdministrativeArea) ?? dolu(y.locality);
+    final parcalar = [dolu(y.subLocality), dolu(y.thoroughfare) ?? dolu(y.street), ilce, il].whereType<String>();
+    return Adres(il: il, ilce: ilce, tamAdres: parcalar.isEmpty ? null : parcalar.toSet().join(', '));
+  } catch (_) {
+    return null;
   }
 }

@@ -7,6 +7,7 @@ import 'package:kent_ihbar/ekranlar/giris_ekrani.dart';
 import 'package:kent_ihbar/ekranlar/sohbet_ekrani.dart';
 import 'package:kent_ihbar/ekranlar/yeni_ihbar_ekrani.dart';
 import 'package:kent_ihbar/kapsam.dart';
+import 'package:kent_ihbar/kimlik.dart';
 import 'package:kent_ihbar/konum.dart';
 import 'package:kent_ihbar/model.dart';
 import 'package:kent_ihbar/tema.dart';
@@ -25,7 +26,10 @@ void main() {
   };
   final Widget ana = switch (_ekran) {
     'giris' => const GirisEkrani(),
-    'dogrulama' => const DogrulamaEkrani(hedef: '+90 532 ••• •• 05'),
+    'dogrulama' => const DogrulamaEkrani(
+      hedef: '+90 532 ••• •• 05',
+      kodOturumu: KodOturumu(telefon: '+905324182705', dogrulamaId: 'onizleme'),
+    ),
     _ => AnaKabuk(baslangicSekme: sekme),
   };
   runApp(

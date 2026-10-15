@@ -38,7 +38,7 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
             isDestructiveAction: true,
             onPressed: () {
               Navigator.of(c).pop();
-              DurumKapsami.oku(context).oturum = const OturumYok();
+              DurumKapsami.oku(context).cikisYap();
             },
             child: const Text('Çıkış yap'),
           ),
@@ -123,7 +123,8 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
   Widget _profilKarti(KIRenk r, UygulamaDurumu durum) {
     final oturum = durum.oturum;
     if (oturum is OturumUye) {
-      final benimIhbarlarim = durum.ihbarlar.where((i) => i.benim).length;
+      final benimIhbarlarim = durum.benimIhbarlarim.veri.length;
+      final adSoyad = durum.profil?.adSoyad;
       return Kart(
         child: Row(
           children: [
@@ -132,14 +133,16 @@ class _ProfilEkraniState extends State<ProfilEkrani> {
               height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(color: r.birincilYumusak, shape: BoxShape.circle),
-              child: Text('T', style: KIFont.baslik(18).renk(r.birincilMetin)),
+              child: adSoyad == null
+                  ? Icon(Icons.person_outline_rounded, size: 24, color: r.birincilMetin)
+                  : Text(turkceBuyuk(adSoyad.characters.first), style: KIFont.baslik(18).renk(r.birincilMetin)),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Hoş geldin', style: KIFont.kartBasligi.renk(r.metin)),
+                  Text(adSoyad ?? 'Hoş geldin', style: KIFont.kartBasligi.renk(r.metin)),
                   const SizedBox(height: 2),
                   Text(oturum.telefon, style: KIFont.govdeKucuk.renk(r.metinIkincil)),
                 ],

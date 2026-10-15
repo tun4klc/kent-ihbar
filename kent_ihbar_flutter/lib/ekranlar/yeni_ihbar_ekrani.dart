@@ -3,8 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:latlong2/latlong.dart' show LatLng;
+import 'package:url_launcher/url_launcher.dart';
 
+import '../api.dart';
 import '../bilesenler.dart';
 import '../kapsam.dart';
 import '../model.dart';
@@ -24,9 +25,12 @@ class _YeniIhbarEkraniState extends State<YeniIhbarEkrani> {
   Uint8List? _foto;
   final _aciklama = TextEditingController();
   final _aciklamaOdak = FocusNode();
-  bool _gonderildi = false;
+  bool _gonderiliyor = false;
+  Ihbar? _gonderilen;
 
-  bool get _gonderilebilir => _kategori != null && _foto != null;
+  bool get _gonderildi => _gonderilen != null;
+
+  bool _gonderilebilir(bool konumVar) => _kategori != null && _foto != null && konumVar && !_gonderiliyor;
 
   @override
   void initState() {
@@ -52,27 +56,27 @@ class _YeniIhbarEkraniState extends State<YeniIhbarEkrani> {
     }
   }
 
-  void _gonder() {
+  Future<void> _gonder() async {
     final kategori = _kategori;
-    if (kategori == null) return;
-    final konum = KonumKapsami.oku(context);
-    final rastgele = math.Random();
-    double sapma() => (rastgele.nextDouble() * 2 - 1) * 0.008;
-    final yer = konum.konum ?? LatLng(OrnekVeri.bornova.latitude + sapma(), OrnekVeri.bornova.longitude + sapma());
-    DurumKapsami.oku(context).ihbarEkle(
-      Ihbar(
+    final yer = KonumKapsami.oku(context).konum;
+    if (kategori == null || yer == null) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _gonderiliyor = true);
+    try {
+      final ihbar = await DurumKapsami.oku(context).ihbarGonder(
         kategori: kategori,
-        durum: Durum.beklemede,
-        aciklama: _aciklama.text.isEmpty ? 'Açıklama eklenmedi.' : _aciklama.text,
-        adres: konum.izinVar ? 'Bulunduğun konum' : 'Bornova, İzmir',
-        koordinat: yer,
-        tarih: DateTime.now(),
+        konum: yer,
+        aciklama: _aciklama.text.trim().isEmpty ? null : _aciklama.text.trim(),
         foto: _foto,
-        benim: true,
-      ),
-    );
-    HapticFeedback.heavyImpact();
-    setState(() => _gonderildi = true);
+      );
+      if (!mounted) return;
+      HapticFeedback.heavyImpact();
+      setState(() => _gonderilen = ihbar);
+    } on ApiHatasi catch (e) {
+      if (mounted) hataGoster(context, e.mesaj);
+    } finally {
+      if (mounted) setState(() => _gonderiliyor = false);
+    }
   }
 
   @override
@@ -132,12 +136,18 @@ class _YeniIhbarEkraniState extends State<YeniIhbarEkrani> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          konum.izinVar ? 'Bulunduğun konum' : 'Bornova, İzmir (örnek)',
+                          konum.konum != null
+                              ? 'Bulunduğun konum'
+                              : konum.izinVar
+                              ? 'Konum alınıyor…'
+                              : 'Konum izni gerekli',
                           style: KIFont.govde(15, Agirlik.yariKalin).renk(r.metin),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          konum.izinVar ? 'GPS ile alındı' : 'Konum izni verirsen tam yer otomatik alınır',
+                          konum.konum != null
+                              ? 'GPS ile alındı'
+                              : 'İhbarın doğru belediyeye gitmesi için konumun gerekiyor',
                           style: KIFont.govde(13).renk(r.metinIkincil),
                         ),
                       ],
@@ -165,11 +175,28 @@ class _YeniIhbarEkraniState extends State<YeniIhbarEkrani> {
             ),
           ),
           const SizedBox(height: KI.space6),
-          BirincilDugme(baslik: 'Gönder', ikon: Icons.send_outlined, onPressed: _gonderilebilir ? _gonder : null),
-          if (!_gonderilebilir) ...[
+          if (_kategori?.acil ?? false) ...[
+            IzinBandi(
+              ikon: Icons.emergency_outlined,
+              metin: 'Can güvenliği tehlikedeyse önce 112 Acil Çağrı Merkezi\'ni ara.',
+              eylemAdi: '112',
+              eylem: () => launchUrl(Uri.parse('tel:112')),
+            ),
+            const SizedBox(height: KI.space5),
+          ],
+          BirincilDugme(
+            baslik: _gonderiliyor ? 'Gönderiliyor…' : 'Gönder',
+            ikon: _gonderiliyor ? null : Icons.send_outlined,
+            onPressed: _gonderilebilir(konum.konum != null) ? _gonder : null,
+          ),
+          if (!_gonderilebilir(konum.konum != null) && !_gonderiliyor) ...[
             const SizedBox(height: KI.space3),
             Text(
-              _kategori == null ? 'Önce bir kategori seç.' : 'Göndermek için bir fotoğraf ekle.',
+              _kategori == null
+                  ? 'Önce bir kategori seç.'
+                  : _foto == null
+                  ? 'Göndermek için bir fotoğraf ekle.'
+                  : 'Göndermek için konum izni ver.',
               style: KIFont.altYazi.renk(r.metinIkincil),
               textAlign: TextAlign.center,
             ),
@@ -329,12 +356,14 @@ class _YeniIhbarEkraniState extends State<YeniIhbarEkrani> {
           Text('İhbarın iletildi', style: KIFont.ekranBasligi.renk(r.metin)),
           const SizedBox(height: KI.space4),
           Text(
-            "Bornova Belediyesi'ne ulaştı. Durumu değiştiğinde sana haber vereceğiz.",
+            _gonderilen?.belediyeAdi == null
+                ? 'İlgili belediyeye ulaştı. Durumu değiştiğinde sana haber vereceğiz.'
+                : "${_gonderilen!.belediyeAdi}'ne ulaştı. Durumu değiştiğinde sana haber vereceğiz.",
             style: KIFont.govdeMetni.renk(r.metinIkincil),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: KI.space4),
-          const DurumRozeti(durum: Durum.beklemede),
+          DurumRozeti(durum: _gonderilen?.durum ?? Durum.beklemede),
           const Spacer(),
           BirincilDugme(baslik: 'Tamam', onPressed: () => Navigator.of(context).pop()),
         ],

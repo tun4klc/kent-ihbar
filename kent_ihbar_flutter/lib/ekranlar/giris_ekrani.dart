@@ -6,14 +6,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../api.dart';
 import '../bilesenler.dart';
 import '../kapsam.dart';
+import '../kimlik.dart';
 import '../model.dart';
 import '../tema.dart';
+import 'profil_tamamlama_ekrani.dart';
 
 // MARK: - Giriş
-
-enum _Yontem { telefon, eposta }
 
 class GirisEkrani extends StatefulWidget {
   const GirisEkrani({super.key});
@@ -23,30 +24,23 @@ class GirisEkrani extends StatefulWidget {
 }
 
 class _GirisEkraniState extends State<GirisEkrani> {
-  _Yontem _yontem = _Yontem.telefon;
   final _telefon = TextEditingController();
-  final _eposta = TextEditingController();
   final _telefonOdak = FocusNode();
-  final _epostaOdak = FocusNode();
+  bool _gonderiliyor = false;
   late final _kosullar = _baglanti('https://example.com/kosullar');
   late final _kvkk = _baglanti('https://example.com/kvkk');
 
   @override
   void initState() {
     super.initState();
-    for (final n in [_telefonOdak, _epostaOdak]) {
-      n.addListener(() => setState(() {}));
-    }
+    _telefonOdak.addListener(() => setState(() {}));
     _telefon.addListener(() => setState(() {}));
-    _eposta.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _telefon.dispose();
-    _eposta.dispose();
     _telefonOdak.dispose();
-    _epostaOdak.dispose();
     _kosullar.dispose();
     _kvkk.dispose();
     super.dispose();
@@ -54,14 +48,7 @@ class _GirisEkraniState extends State<GirisEkrani> {
 
   String get _telefonRakam => _telefon.text.replaceAll(RegExp(r'\D'), '');
 
-  bool get _epostaGecerli {
-    final p = _eposta.text.split('@');
-    return p.length == 2 && p[1].contains('.') && p[0].isNotEmpty;
-  }
-
-  bool get _gonderilebilir => _yontem == _Yontem.telefon ? _telefonRakam.length == 10 : _epostaGecerli;
-
-  bool get _epostaHatali => _eposta.text.isNotEmpty && !_epostaOdak.hasFocus && !_epostaGecerli;
+  bool get _gonderilebilir => _telefonRakam.length == 10 && !_gonderiliyor;
 
   String get _maskeliTelefon {
     final r = _telefonRakam;
@@ -69,13 +56,33 @@ class _GirisEkraniState extends State<GirisEkrani> {
     return '+90 ${r.substring(0, 3)} ••• •• ${r.substring(8, 10)}';
   }
 
-  void _kodGonder() {
+  Future<void> _kodGonder() async {
     FocusScope.of(context).unfocus();
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => DogrulamaEkrani(hedef: _yontem == _Yontem.telefon ? _maskeliTelefon : _eposta.text),
-      ),
-    );
+    final durum = DurumKapsami.oku(context);
+    final gezgin = Navigator.of(context);
+    setState(() => _gonderiliyor = true);
+    try {
+      final kodOturumu = await durum.kodGonder('+90$_telefonRakam');
+      if (!mounted) return;
+      if (kodOturumu.otomatik) {
+        // Android kodu kendisi okudu; doğrudan giriş.
+        if (!await durum.girisYap(kodOturumu) && mounted) {
+          await gezgin.push(MaterialPageRoute<void>(builder: (_) => const ProfilTamamlamaEkrani()));
+        }
+        return;
+      }
+      await gezgin.push(
+        MaterialPageRoute<void>(
+          builder: (_) => DogrulamaEkrani(hedef: _maskeliTelefon, kodOturumu: kodOturumu),
+        ),
+      );
+    } on KimlikHatasi catch (e) {
+      if (mounted) hataGoster(context, e.mesaj);
+    } on ApiHatasi catch (e) {
+      if (mounted) hataGoster(context, e.mesaj);
+    } finally {
+      if (mounted) setState(() => _gonderiliyor = false);
+    }
   }
 
   void _edevlet() {
@@ -138,25 +145,12 @@ class _GirisEkraniState extends State<GirisEkrani> {
     return Kart(
       child: Column(
         children: [
-          Segment<_Yontem>(
-            secenekler: const [
-              SegmentSecenegi(deger: _Yontem.telefon, baslik: 'Telefon', ikon: Icons.phone_outlined),
-              SegmentSecenegi(deger: _Yontem.eposta, baslik: 'E-posta', ikon: Icons.mail_outline_rounded),
-            ],
-            secili: _yontem,
-            degisti: (y) => setState(() => _yontem = y),
-          ),
+          _telefonAlani(r),
           const SizedBox(height: KI.space4),
-          AnimatedSize(
-            duration: KI.sureOrta,
-            curve: KI.egriStandart,
-            child: AnimatedSwitcher(
-              duration: KI.sureOrta,
-              child: _yontem == _Yontem.telefon ? _telefonAlani(r) : _epostaAlani(r),
-            ),
+          BirincilDugme(
+            baslik: _gonderiliyor ? 'Gönderiliyor…' : 'Kod gönder',
+            onPressed: _gonderilebilir ? _kodGonder : null,
           ),
-          const SizedBox(height: KI.space4),
-          BirincilDugme(baslik: 'Kod gönder', onPressed: _gonderilebilir ? _kodGonder : null),
           const SizedBox(height: KI.space4),
           const Ayirici('veya'),
           const SizedBox(height: KI.space4),
@@ -199,38 +193,6 @@ class _GirisEkraniState extends State<GirisEkrani> {
         ),
         const SizedBox(height: 6),
         Text('Doğrulama kodunu SMS ile göndereceğiz.', style: KIFont.altYazi.renk(r.metinIkincil)),
-      ],
-    );
-  }
-
-  Widget _epostaAlani(KIRenk r) {
-    return Column(
-      key: const ValueKey('eposta'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const AlanEtiketi('E-posta'),
-        const SizedBox(height: 6),
-        GirdiKutusu(
-          odakta: _epostaOdak.hasFocus,
-          hata: _epostaHatali,
-          children: [
-            Icon(Icons.mail_outline_rounded, size: 20, color: r.metinSoluk),
-            SadeAlan(
-              denetleyici: _eposta,
-              odak: _epostaOdak,
-              ipucu: 'ornek@eposta.com',
-              klavye: TextInputType.emailAddress,
-              otomatikDoldurma: const [AutofillHints.email],
-              buyukHarf: TextCapitalization.none,
-              duzeltme: false,
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _epostaHatali ? 'Geçerli bir e-posta adresi gir.' : 'Giriş bağlantısı ve kodu e-postana göndereceğiz.',
-          style: KIFont.altYazi.renk(_epostaHatali ? r.kritik : r.metinIkincil),
-        ),
       ],
     );
   }
@@ -283,9 +245,10 @@ class TelefonBicimleyici extends TextInputFormatter {
 // MARK: - Doğrulama kodu
 
 class DogrulamaEkrani extends StatefulWidget {
-  const DogrulamaEkrani({super.key, required this.hedef});
+  const DogrulamaEkrani({super.key, required this.hedef, required this.kodOturumu});
 
   final String hedef;
+  final KodOturumu kodOturumu;
 
   @override
   State<DogrulamaEkrani> createState() => _DogrulamaEkraniState();
@@ -294,8 +257,10 @@ class DogrulamaEkrani extends StatefulWidget {
 class _DogrulamaEkraniState extends State<DogrulamaEkrani> with SingleTickerProviderStateMixin {
   final _kod = TextEditingController();
   final _odak = FocusNode();
+  late KodOturumu _kodOturumu = widget.kodOturumu;
   int _kalan = 60;
   bool _hata = false;
+  bool _dogrulaniyor = false;
   late final Timer _zamanlayici;
   late final AnimationController _salla = AnimationController(vsync: this, duration: const Duration(milliseconds: 350));
 
@@ -323,18 +288,45 @@ class _DogrulamaEkraniState extends State<DogrulamaEkrani> with SingleTickerProv
     if (yeni.length == 6) _dogrula();
   }
 
-  void _dogrula() {
-    if (_kod.text.length != 6) return;
-    if (_kod.text == '000000') {
-      setState(() => _hata = true);
-      _salla.forward(from: 0);
-      _kod.clear();
-      return;
-    }
+  Future<void> _dogrula() async {
+    if (_kod.text.length != 6 || _dogrulaniyor) return;
     _odak.unfocus();
     final durum = DurumKapsami.oku(context);
-    Navigator.of(context).popUntil((r) => r.isFirst);
-    durum.oturum = OturumUye(widget.hedef);
+    final gezgin = Navigator.of(context);
+    setState(() => _dogrulaniyor = true);
+    try {
+      final profilTamam = await durum.girisYap(_kodOturumu, _kod.text);
+      if (!mounted) return;
+      if (profilTamam) {
+        gezgin.popUntil((r) => r.isFirst);
+      } else {
+        await gezgin.pushReplacement(MaterialPageRoute<void>(builder: (_) => const ProfilTamamlamaEkrani()));
+      }
+    } on KimlikHatasi catch (e) {
+      if (!mounted) return;
+      if (e.kodHatali) {
+        setState(() => _hata = true);
+        _salla.forward(from: 0);
+        _kod.clear();
+        _odak.requestFocus();
+      } else {
+        hataGoster(context, e.mesaj);
+      }
+    } on ApiHatasi catch (e) {
+      if (mounted) hataGoster(context, e.mesaj);
+    } finally {
+      if (mounted) setState(() => _dogrulaniyor = false);
+    }
+  }
+
+  Future<void> _tekrarGonder() async {
+    setState(() => _kalan = 60);
+    try {
+      _kodOturumu = await DurumKapsami.oku(context)
+          .kodGonder(_kodOturumu.telefon, yenidenGonderme: _kodOturumu.yenidenGonderme);
+    } on KimlikHatasi catch (e) {
+      if (mounted) hataGoster(context, e.mesaj);
+    }
   }
 
   @override
@@ -430,14 +422,9 @@ class _DogrulamaEkraniState extends State<DogrulamaEkrani> with SingleTickerProv
                           baslik: _kalan > 0
                               ? 'Tekrar gönder · 0:${_kalan.toString().padLeft(2, '0')}'
                               : 'Tekrar gönder',
-                          onPressed: _kalan > 0 ? null : () => setState(() => _kalan = 60),
+                          onPressed: _kalan > 0 ? null : _tekrarGonder,
                         ),
                       ],
-                    ),
-                    const SizedBox(height: KI.space5),
-                    Text(
-                      'Prototip: 000000 dışındaki herhangi bir 6 haneli kod kabul edilir.',
-                      style: KIFont.altYazi.renk(r.metinSoluk),
                     ),
                     const Spacer(),
                     Container(
@@ -463,8 +450,10 @@ class _DogrulamaEkraniState extends State<DogrulamaEkrani> with SingleTickerProv
                     const SizedBox(height: KI.space5),
                     ListenableBuilder(
                       listenable: _kod,
-                      builder: (_, _) =>
-                          BirincilDugme(baslik: 'Doğrula', onPressed: _kod.text.length < 6 ? null : _dogrula),
+                      builder: (_, _) => BirincilDugme(
+                        baslik: _dogrulaniyor ? 'Doğrulanıyor…' : 'Doğrula',
+                        onPressed: _kod.text.length < 6 || _dogrulaniyor ? null : _dogrula,
+                      ),
                     ),
                   ],
                 ),

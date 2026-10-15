@@ -1,19 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../api.dart';
 import '../bilesenler.dart';
 import '../kapsam.dart';
 import '../model.dart';
 import '../tema.dart';
 
 enum Olcut {
-  genel('Genel'),
-  enHizli('En hızlı'),
-  memnuniyet('Memnuniyet'),
-  aylik('Aylık çözüm');
+  genel('Genel', 'score'),
+  enHizli('En hızlı', 'speed'),
+  memnuniyet('Memnuniyet', 'satisfaction'),
+  aylik('Aylık çözüm', 'volume');
 
-  const Olcut(this.ad);
+  const Olcut(this.ad, this.api);
   final String ad;
+
+  /// `/leaderboard?sort=` değeri.
+  final String api;
 }
 
 class SiralamaEkrani extends StatefulWidget {
@@ -30,57 +36,77 @@ class _SiralamaEkraniState extends State<SiralamaEkrani> {
   final _aramaOdak = FocusNode();
   Olcut _olcut = Olcut.genel;
   String? _sehir;
+  String _sonArama = '';
+  Timer? _aramaZamanlayici;
+
+  List<Belediye> _liste = [];
+  bool _yukleniyor = false;
+  bool _sonSayfa = true;
+  int _sayfa = 0;
+  String? _hata;
+  int _istekNo = 0;
 
   @override
   void initState() {
     super.initState();
-    _arama.addListener(() => setState(() {}));
+    _arama.addListener(_aramaDegisti);
     _aramaOdak.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _yukle());
+  }
+
+  void _aramaDegisti() {
+    setState(() {});
+    final q = _arama.text.trim();
+    if (q == _sonArama) return;
+    _aramaZamanlayici?.cancel();
+    _aramaZamanlayici = Timer(const Duration(milliseconds: 400), () {
+      _sonArama = q;
+      _yukle();
+    });
+  }
+
+  /// Sıralama, şehir ve arama sunucuda yapılır; [devam] true ise sonraki sayfa eklenir.
+  Future<void> _yukle({bool devam = false}) async {
+    final no = ++_istekNo;
+    final sayfa = devam ? _sayfa + 1 : 0;
+    setState(() {
+      _yukleniyor = true;
+      _hata = null;
+    });
+    try {
+      final s = await DurumKapsami.oku(context).api
+          .siralama(olcut: _olcut.api, sehir: _sehir, arama: _sonArama, sayfa: sayfa);
+      if (!mounted || no != _istekNo) return;
+      setState(() {
+        _liste = devam ? [..._liste, ...s.ogeler] : s.ogeler;
+        _sayfa = s.sayfa;
+        _sonSayfa = s.sonSayfa;
+      });
+    } on ApiHatasi catch (e) {
+      if (mounted && no == _istekNo) setState(() => _hata = e.mesaj);
+    } finally {
+      if (mounted && no == _istekNo) setState(() => _yukleniyor = false);
+    }
+  }
+
+  void _olcutSec(Olcut o) {
+    if (o == _olcut) return;
+    setState(() => _olcut = o);
+    _yukle();
+  }
+
+  void _sehirSec(String? s) {
+    if (s == _sehir) return;
+    setState(() => _sehir = s);
+    _yukle();
   }
 
   @override
   void dispose() {
+    _aramaZamanlayici?.cancel();
     _arama.dispose();
     _aramaOdak.dispose();
     super.dispose();
-  }
-
-  /// Türkçe alfabe sırası (Ç, Ğ, İ, Ö, Ş, Ü doğru yerde).
-  static int _turkceKarsilastir(String a, String b) {
-    const alfabe = 'abcçdefgğhıijklmnoöprsştuüvyz';
-    int sira(String c) {
-      final i = alfabe.indexOf(c);
-      return i < 0 ? 100 + c.codeUnitAt(0) : i;
-    }
-
-    final x = turkceKucuk(a), y = turkceKucuk(b);
-    for (var i = 0; i < x.length && i < y.length; i++) {
-      final f = sira(x[i]) - sira(y[i]);
-      if (f != 0) return f;
-    }
-    return x.length - y.length;
-  }
-
-  List<String> get _sehirler => (OrnekVeri.belediyeler.map((b) => b.sehir).toSet().toList())..sort(_turkceKarsilastir);
-
-  List<Belediye> get _liste {
-    var l = OrnekVeri.belediyeler.toList();
-    if (_sehir != null) l = l.where((b) => b.sehir == _sehir).toList();
-    final q = turkceKucuk(_arama.text.trim());
-    if (q.isNotEmpty) {
-      l = l.where((b) => turkceKucuk(b.ad).contains(q) || turkceKucuk(b.sehir).contains(q)).toList();
-    }
-    switch (_olcut) {
-      case Olcut.genel:
-        l.sort((a, b) => b.puan.compareTo(a.puan));
-      case Olcut.enHizli:
-        l.sort((a, b) => a.ortalamaGun.compareTo(b.ortalamaGun));
-      case Olcut.memnuniyet:
-        l.sort((a, b) => b.memnuniyet.compareTo(a.memnuniyet));
-      case Olcut.aylik:
-        l.sort((a, b) => b.aylikCozum.compareTo(a.aylikCozum));
-    }
-    return l;
   }
 
   void _paylas(BuildContext context) {
@@ -97,6 +123,7 @@ class _SiralamaEkraniState extends State<SiralamaEkrani> {
   Widget build(BuildContext context) {
     final r = KIRenk.of(context);
     final konum = KonumKapsami.of(context);
+    final seninId = DurumKapsami.of(context).profil?.belediyeId;
     final liste = _liste;
     final ilkSira = liste.length >= 3 ? 3 : 0;
     final kalan = liste.skip(ilkSira).toList();
@@ -168,19 +195,19 @@ class _SiralamaEkraniState extends State<SiralamaEkrani> {
                       _cipSatiri([
                         for (final o in Olcut.values)
                           GestureDetector(
-                            onTap: () => setState(() => _olcut = o),
+                            onTap: () => _olcutSec(o),
                             child: FiltreCipi(baslik: o.ad, secili: _olcut == o),
                           ),
                       ]),
                       const SizedBox(height: 10),
                       _cipSatiri([
                         GestureDetector(
-                          onTap: () => setState(() => _sehir = null),
+                          onTap: () => _sehirSec(null),
                           child: FiltreCipi(baslik: 'Tüm şehirler', secili: _sehir == null),
                         ),
-                        for (final s in _sehirler)
+                        for (final s in iller)
                           GestureDetector(
-                            onTap: () => setState(() => _sehir = s),
+                            onTap: () => _sehirSec(s),
                             child: FiltreCipi(baslik: s, secili: _sehir == s),
                           ),
                       ]),
@@ -194,7 +221,19 @@ class _SiralamaEkraniState extends State<SiralamaEkrani> {
               duration: KI.sureOrta,
               curve: KI.egriStandart,
               alignment: Alignment.topCenter,
-              child: liste.isEmpty
+              child: liste.isEmpty && _yukleniyor
+                  ? const Yukleniyor(yukseklik: 200)
+                  : liste.isEmpty && _hata != null
+                  ? SizedBox(
+                      width: double.infinity,
+                      child: BosDurum(
+                        baslik: 'Sıralama yüklenemedi',
+                        aciklama: _hata!,
+                        eylemAdi: 'Tekrar dene',
+                        eylem: _yukle,
+                      ),
+                    )
+                  : liste.isEmpty
                   ? SizedBox(
                       width: double.infinity,
                       child: BosDurum(
@@ -219,13 +258,23 @@ class _SiralamaEkraniState extends State<SiralamaEkrani> {
                               child: Column(
                                 children: [
                                   for (var i = 0; i < kalan.length; i++) ...[
-                                    SiralamaSatiri(sira: ilkSira + i + 1, belediye: kalan[i]),
+                                    SiralamaSatiri(
+                                      sira: ilkSira + i + 1,
+                                      belediye: kalan[i],
+                                      senin: kalan[i].id == seninId,
+                                    ),
                                     if (i < kalan.length - 1) Container(height: 1, color: r.cizgi),
                                   ],
                                 ],
                               ),
                             ),
                           ),
+                          const SizedBox(height: KI.space5),
+                        ],
+                        if (!_sonSayfa) ...[
+                          _yukleniyor
+                              ? const Yukleniyor(yukseklik: 52)
+                              : IkincilDugme(baslik: 'Daha fazla göster', onPressed: () => _yukle(devam: true)),
                           const SizedBox(height: KI.space5),
                         ],
                         if (!konum.izinVar) ...[
@@ -237,10 +286,6 @@ class _SiralamaEkraniState extends State<SiralamaEkrani> {
                           ),
                           const SizedBox(height: KI.space5),
                         ],
-                        Text(
-                          'ÖRNEK VERİ',
-                          style: KIFont.govde(11, Agirlik.yariKalin).copyWith(letterSpacing: 0.5, color: r.metinSoluk),
-                        ),
                       ],
                     ),
             ),
@@ -284,8 +329,8 @@ class _LiderlerPodyumu extends StatelessWidget {
 
   String _deger(Belediye b) => switch (olcut) {
     Olcut.genel => turkceOndalik(b.puan),
-    Olcut.enHizli => '${turkceOndalik(b.ortalamaGun)} gün',
-    Olcut.memnuniyet => '%${b.memnuniyet}',
+    Olcut.enHizli => b.ortalamaGun == null ? '—' : '${turkceOndalik(b.ortalamaGun!)} gün',
+    Olcut.memnuniyet => b.memnuniyet == null ? '—' : '%${b.memnuniyet}',
     Olcut.aylik => turkceSayi(b.aylikCozum),
   };
 

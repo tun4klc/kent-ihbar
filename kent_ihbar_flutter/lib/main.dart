@@ -1,18 +1,31 @@
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'ekranlar/ana_kabuk.dart';
 import 'ekranlar/giris_ekrani.dart';
+import 'firebase_options.dart';
 import 'kapsam.dart';
 import 'konum.dart';
 import 'model.dart';
 import 'tema.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  runApp(KentIhbarUygulamasi(durum: UygulamaDurumu()));
+  final secenekler = DefaultFirebaseOptions.currentPlatform;
+  try {
+    // iOS'ta GoogleService-Info.plist varsa seçenek vermeden de başlar.
+    await Firebase.initializeApp(options: secenekler);
+  } catch (e) {
+    debugPrint('Firebase başlatılamadı, telefonla giriş kapalı: $e');
+  }
+  final durum = UygulamaDurumu();
+  runApp(KentIhbarUygulamasi(durum: durum));
+  unawaited(durum.baslat());
 }
 
 class KentIhbarUygulamasi extends StatefulWidget {
