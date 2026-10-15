@@ -116,12 +116,9 @@ class _HaritaEkraniState extends State<HaritaEkrani> with TickerProviderStateMix
           ),
           children: [
             TileLayer(
-              urlTemplate: r.koyu
-                  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                  : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
-              retinaMode: RetinaMode.isHighDensity(context),
-              userAgentPackageName: 'com.tunakilic.kentihbar',
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.tunakilic.kentihbar.flutter',
+              tileBuilder: r.koyu ? darkModeTileBuilder : null,
             ),
             if (konum.konum != null)
               MarkerLayer(

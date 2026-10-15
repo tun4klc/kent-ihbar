@@ -234,6 +234,7 @@ class _AltMenuState extends State<AltMenu> with TickerProviderStateMixin {
             widget.degisti(s);
           },
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
                 width: 56,
@@ -277,6 +278,7 @@ class _AltMenuState extends State<AltMenu> with TickerProviderStateMixin {
             widget.fab();
           },
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 56,

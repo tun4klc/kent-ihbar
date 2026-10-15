@@ -1,6 +1,15 @@
 # Kent İhbar
 
-Mahalledeki sorunları (çukur, kırık lamba, çöp vb.) fotoğraf ve konumla ihbar etmeye yarayan SwiftUI iOS uygulaması.
+Mahalledeki sorunları (çukur, kırık lamba, çöp vb.) fotoğraf ve konumla ihbar etmeye yarayan uygulama.
+
+Repoda aynı uygulamanın iki sürümü var:
+
+| Klasör | Teknoloji | Platform |
+|---|---|---|
+| `KentIhbar/` + `KentIhbar.xcodeproj` | SwiftUI (orijinal) | iOS |
+| [`kent_ihbar_flutter/`](kent_ihbar_flutter/README.md) | Flutter | iOS + Android |
+
+Flutter sürümünün kurulumu için [`kent_ihbar_flutter/README.md`](kent_ihbar_flutter/README.md) dosyasına bakın. Aşağıdaki adımlar SwiftUI sürümü içindir.
 
 ## Gereksinimler
 

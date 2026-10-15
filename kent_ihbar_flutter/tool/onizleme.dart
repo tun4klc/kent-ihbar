@@ -15,6 +15,7 @@ const _ekran = String.fromEnvironment('EKRAN', defaultValue: 'ana');
 const _koyu = bool.fromEnvironment('KOYU');
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   final durum = UygulamaDurumu()..oturum = const OturumUye('+90 532 ••• •• 05');
   final sekme = switch (_ekran) {
     'harita' => Sekme.harita,
