@@ -72,6 +72,8 @@ void main() {
       expect(TelefonBicimleyici.bicimle('5324182705'), '532 418 27 05');
       expect(TelefonBicimleyici.bicimle('53241'), '532 41');
       expect(TelefonBicimleyici.bicimle('532-418-27-05-99'), '532 418 27 05');
+      expect(TelefonBicimleyici.bicimle('05550100002'), '555 010 00 02');
+      expect(TelefonBicimleyici.bicimle('905324182705'), '532 418 27 05');
     });
 
     test('Türkçe sayı biçimleri', () {

@@ -222,7 +222,8 @@ class _GirisEkraniState extends State<GirisEkrani> {
 /// "5324182705" → "532 418 27 05"
 class TelefonBicimleyici extends TextInputFormatter {
   static String bicimle(String girdi) {
-    final r = girdi.replaceAll(RegExp(r'\D'), '');
+    // Başa yazılan 0 ya da 90 alınmaz; +90 alanın solunda zaten var.
+    final r = girdi.replaceAll(RegExp(r'\D'), '').replaceFirst(RegExp(r'^(90(?=5)|0+)'), '');
     final rakamlar = r.length > 10 ? r.substring(0, 10) : r;
     final b = StringBuffer();
     for (var i = 0; i < rakamlar.length; i++) {
