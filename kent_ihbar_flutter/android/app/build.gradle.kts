@@ -1,5 +1,7 @@
 plugins {
     id("com.android.application")
+    // android/app/google-services.json (Firebase kent-66a81) dosyasını okur.
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -16,9 +18,9 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        // Firebase'de (kent-66a81) kayıtlı paketle denemek için:
-        //   flutter run --android-project-arg=paket=soft.mena.kent
-        applicationId = (project.findProperty("paket") as String?) ?: "com.tunakilic.kentihbar.flutter"
+        // Firebase'de (kent-66a81) kayıtlı paket; google-services.json yalnızca bu paketi tanır.
+        // Başka paketle derlemek için: --android-project-arg=paket=<paket> (google-services.json'a o paket eklenmeli).
+        applicationId = (project.findProperty("paket") as String?) ?: "soft.mena.kent"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

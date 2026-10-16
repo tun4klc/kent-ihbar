@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "324246946708",
+    "project_id": "kent-66a81",
+    "storage_bucket": "kent-66a81.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:324246946708:android:970e3b1e5301e633c28581",
+        "android_client_info": {
+          "package_name": "soft.mena.kent"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "324246946708-indaa6a9hsp08lbol1vap05b6nno0fpu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "soft.mena.kent",
+            "certificate_hash": "c9fcbe0f2f10e1364545642a939db53dedcaff99"
+          }
+        },
+        {
+          "client_id": "324246946708-095933o25qqttcfljv1785b1dqg47l3j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUChtZOW8WFZCV2gDZCGuQIJzxHB7vBsI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "324246946708-095933o25qqttcfljv1785b1dqg47l3j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
